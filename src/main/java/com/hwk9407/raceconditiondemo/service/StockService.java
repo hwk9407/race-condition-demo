@@ -31,7 +31,7 @@ public class StockService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품입니다."));
         int stock = product.getStock();
         String remainingStockKey = "remaining_stock:" + productId;
-        redisTemplate.opsForValue().set(remainingStockKey, stock, 32, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(remainingStockKey, stock, 2, TimeUnit.HOURS);
 
         return stock;
     }
