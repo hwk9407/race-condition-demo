@@ -21,6 +21,6 @@ public class OrderService {
         product.decrementStock(quantity);
         productRepository.save(product);
 
-        return new PlaceOrderResponse(productId);
+        return new PlaceOrderResponse(product.getId());
     }
 }
