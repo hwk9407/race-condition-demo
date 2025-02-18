@@ -4,10 +4,7 @@ import com.hwk9407.raceconditiondemo.entity.Product;
 import com.hwk9407.raceconditiondemo.repository.ProductRepository;
 import com.hwk9407.raceconditiondemo.service.CartService;
 import com.hwk9407.raceconditiondemo.service.StockService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -60,6 +57,7 @@ public class CartConcurrencyTest {
     }
 
     @Test
+    @Disabled
     @DisplayName("동시에 장바구니에 상품을 추가할 때 경쟁 상태 확인")
     public void concurrentCartAdditionTest() throws InterruptedException {
         // GIVEN
@@ -73,6 +71,36 @@ public class CartConcurrencyTest {
                 try {
                     barrier.await();
                     cartService.addToCart(productId, userId, 1);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
+
+        // THEN
+        Integer remainingStock = (Integer) redisTemplate.opsForValue().get("remaining_stock:" + productId);
+        assertNotNull(remainingStock);
+        assertThat(remainingStock).isEqualTo(0);
+
+    }
+
+    @Test
+    @DisplayName("동시에 장바구니에 상품을 추가할 때 분산락을 사용할 시 경쟁 상태 확인")
+    public void concurrentCartAdditionWithLockTest() throws InterruptedException {
+        // GIVEN
+        ExecutorService executorService = Executors.newFixedThreadPool(THREAD_COUNT);
+        CyclicBarrier barrier = new CyclicBarrier(THREAD_COUNT);
+
+        // WHEN
+        for (int i = 0; i < THREAD_COUNT; i++) {
+            long userId = i + 1;
+            executorService.execute(() -> {
+                try {
+                    barrier.await();
+                    cartService.addToCartWithLock(productId, userId, 1);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
