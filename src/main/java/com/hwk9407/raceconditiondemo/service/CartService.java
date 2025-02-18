@@ -1,9 +1,13 @@
 package com.hwk9407.raceconditiondemo.service;
 
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -13,7 +17,9 @@ public class CartService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final StockService stockService;
+    private final RedissonLockService redissonLockService;
 
+    @Transactional
     public void addToCart(Long productId, Long userId, int quantity) {
         String cartKey = "cart:" + userId;
         String productKey = String.valueOf(productId);
@@ -43,6 +49,17 @@ public class CartService {
                 redisTemplate.expire(remainingStockKey, 2, TimeUnit.HOURS);
             }
         }
+    }
+
+    @Transactional
+    public void addToCartWithLock(Long productId, Long userId, int quantity) {
+        String lockKey = "product_id:" + productId;
+        redissonLockService.lock(
+                lockKey,
+                Duration.ofSeconds(60),
+                () -> addToCart(productId, userId, quantity)
+        );
+
     }
 
     public void removeFromCart(Long userId, Long productId) {
